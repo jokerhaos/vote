@@ -63,18 +63,18 @@ func main() {
 	fmt.Println("此软件只给M3投票！！！")
 	// fmt.Scanf("%d\n", &id)
 	id = 3
-	fmt.Println("请输入需要刷票的次数,默认10000000000次")
+	fmt.Printf("请输入需要刷票的次数,默认10000000000次：")
 	fmt.Scanf("%d\n", &num)
 	if num == 0 {
 		num = 10000000000
 	}
-	fmt.Println("请输入停顿时间,默认10秒")
+	fmt.Printf("请输入停顿时间,默认10秒：")
 	fmt.Scanf("%d\n", &gap)
 	if gap == 0 {
 		gap = 10
 	}
 
-	fmt.Println("密码是否随机默认是，不随机请输入你想要的密码，想随机直接回车")
+	fmt.Printf("密码是否随机默认是，不随机请输入你想要的密码，想随机直接回车：")
 	fmt.Scanf("%s\n", &pwd)
 
 	for i := 0; i < num; i++ {
