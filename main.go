@@ -46,8 +46,21 @@ type VoteResponseParam struct {
 var logger *log.Logger
 
 func init() {
+	directory := "logs"
+	// 检查目录是否存在
+	if _, err := os.Stat(directory); os.IsNotExist(err) {
+		// 目录不存在，创建目录
+		err := os.Mkdir(directory, 0755) // 设置目录权限
+		if err != nil {
+			fmt.Println("Failed to create directory:", err)
+			return
+		}
+		fmt.Println("Directory created successfully.")
+	} else {
+		fmt.Println("Directory already exists.")
+	}
 	//指定路径的文件，无则创建
-	logFile, err := os.OpenFile("./log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(fmt.Sprintf("./logs/log_%d.txt", time.Now().Unix()), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		panic(err)
 	}
