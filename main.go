@@ -109,7 +109,7 @@ func main() {
 			fmt.Println("投票报错咯:", err)
 			return
 		}
-		fmt.Println("======本轮投票结束进行下一次投票======")
+		fmt.Println("======本轮投票结束进行下一次投票======\r\n")
 		time.Sleep(time.Second * time.Duration(gap))
 	}
 
