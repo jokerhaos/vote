@@ -58,6 +58,7 @@ func main() {
 	var id int
 	var num int
 	var gap int
+	var pwd string
 	fmt.Println("-----欢迎使用自动投票助手-----")
 	fmt.Println("此软件只给M3投票！！！")
 	// fmt.Scanf("%d\n", &id)
@@ -73,6 +74,9 @@ func main() {
 		gap = 10
 	}
 
+	fmt.Println("密码是否随机默认是，不随机请输入你想要的密码，想随机直接回车")
+	fmt.Scanf("%s\n", &pwd)
+
 	for i := 0; i < num; i++ {
 		vote := &Vote{}
 		err := vote.setToken()
@@ -82,7 +86,7 @@ func main() {
 		}
 		// fmt.Println("Token:", vote.Token)
 		// fmt.Println("Cookie:", vote.Cookies)
-		err = vote.register()
+		err = vote.register(pwd)
 		if err != nil {
 			fmt.Println("注册账号报错咯:", err)
 			return
@@ -165,12 +169,15 @@ func (selfs *Vote) setToken() error {
 }
 
 // 注册
-func (selfs *Vote) register() error {
+func (selfs *Vote) register(pwd string) error {
 	// 构建请求参数
 	opt := RequestParam{
-		EMAIL:    "997" + utils.RandStr2(12) + "@gmail.com",
-		PASSWORD: utils.RandStr2(12),
+		EMAIL:    utils.RandStr2(utils.RandomInt(12, 15)) + "@gmail.com",
+		PASSWORD: utils.RandStr2(utils.RandomInt(12, 15)),
 		TOKEN:    selfs.Token,
+	}
+	if pwd != "" {
+		opt.PASSWORD = pwd
 	}
 	data, _ := query.Values(opt)
 	fmt.Println("请求参数:", data.Encode())

@@ -29,3 +29,11 @@ func RandStr2(n int) string {
 	rand.Read(result)
 	return hex.EncodeToString(result)
 }
+
+func RandomInt(min, max int) int {
+	// 设置随机种子
+	rand.Seed(time.Now().UnixNano())
+
+	// 生成随机数
+	return rand.Intn(max-min+1) + min
+}
