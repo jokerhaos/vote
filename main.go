@@ -185,6 +185,12 @@ func (selfs *Vote) setToken() error {
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return errors.New(fmt.Sprintf("状态码：%d，内容：%s", resp.StatusCode, string(body)))
+	}
 
 	compileRegex := regexp.MustCompile("\"_token\" value=\"(.*?)\">")
 	matchArr := compileRegex.FindStringSubmatch(string(body))
