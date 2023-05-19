@@ -12,7 +12,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"vote/getter"
 	"vote/utils"
 
 	"github.com/fatih/color"
@@ -103,7 +102,6 @@ func main() {
 	fmt.Scanf("%s\n", &pwd)
 
 	ipChan := make(chan *models.IP, 2000)
-
 	go func() {
 		// Start getters to scraper IP and put it in channel
 		for {
@@ -111,7 +109,7 @@ func main() {
 			time.Sleep(10 * time.Minute)
 		}
 	}()
-
+	// time.Sleep(time.Second * 15)
 	headers := &http.Header{}
 	// 设置请求头
 	headers.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryN2JsHIlOejq9WtWA")
@@ -285,20 +283,20 @@ func ipProxyRun(ipChan chan<- *models.IP) {
 	var wg sync.WaitGroup
 	funs := []func() []*models.IP{
 		// getter.FQDL,  //新代理 404了
-		getter.PZZQZ, //新代理
+		// getter.PZZQZ, //新代理 不稳定都是超时的
 		//getter.Data5u,
 		//getter.Feiyi,
 		//getter.IP66, //need to remove it
-		getter.IP3306,
-		getter.KDL,
+		// getter.IP3306, // 不稳定都是超时的
+		// getter.KDL,
 		//getter.GBJ,	//因为网站限制，无法正常下载数据
 		//getter.Xici,
 		//getter.XDL,
 		//getter.IP181,  // 已经无法使用
 		//getter.YDL,	//失效的采集脚本，用作系统容错实验
 		// getter.PLP, //need to remove it
-		getter.PLPSSL,
-		getter.IP89,
+		// getter.PLPSSL,
+		// getter.IP89,
 	}
 	for _, f := range funs {
 		wg.Add(1)
@@ -310,10 +308,12 @@ func ipProxyRun(ipChan chan<- *models.IP) {
 				}
 			}()
 			temp := f()
-			//log.Println("[run] get into loop")
+			// log.Println("[run] get into loop", temp)
 			for _, v := range temp {
-				// log.Println("[run] len of ipChan %v", v)
+				log.Println("[run] len of ipChan %v", v)
+				// if v.Type1 == "https" {
 				ipChan <- v
+				// }
 			}
 			wg.Done()
 		}(f)

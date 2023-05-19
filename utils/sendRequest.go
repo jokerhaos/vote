@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -52,8 +53,10 @@ func (s *SendRequest) SetProxy(uri string) {
 	// 创建自定义的 Transport
 	transport := &http.Transport{
 		Proxy: http.ProxyURL(proxyURL),
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
 	}
-
 	s.client.Transport = transport
 }
 
