@@ -136,7 +136,7 @@ func main() {
 			// 设置代理ip
 			proxyurl := fmt.Sprintf("%s://%s", proxyIp.Type1, proxyIp.Data)
 			fmt.Println("代理ip：", proxyurl)
-			vote.SendRequest.SetProxy(proxyurl)
+			vote.SendRequest.SetProxy(proxyurl, "socks")
 		default:
 		}
 		err := vote.setToken()

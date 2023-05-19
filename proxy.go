@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -37,29 +36,29 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// 定义处理函数
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		// 处理请求
-		fmt.Println(r.RemoteAddr)
-		fmt.Fprintf(w, "Hello, World!")
-	}
+	// handler := func(w http.ResponseWriter, r *http.Request) {
+	// 	// 处理请求
+	// 	fmt.Println(r.RemoteAddr)
+	// 	fmt.Fprintf(w, "Hello, World!")
+	// }
 
-	// 创建服务器并注册处理函数
-	server := &http.Server{
-		Addr:    "0.0.0.0:9090",
-		Handler: http.HandlerFunc(handler),
-	}
-	// 启动服务器
-	log.Println("Server started on https://localhost:9090")
-	go func() {
-		// if err := server.ListenAndServeTLS("./pem/cert2.pem", "./pem/key2.pem"); err != nil {
-		// 	log.Fatal("Server failed to start: ", err)
-		// }
-	}()
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			log.Fatal("Server failed to start: ", err)
-		}
-	}()
+	// // 创建服务器并注册处理函数
+	// server := &http.Server{
+	// 	Addr:    "0.0.0.0:9090",
+	// 	Handler: http.HandlerFunc(handler),
+	// }
+	// // 启动服务器
+	// log.Println("Server started on https://localhost:9090")
+	// go func() {
+	// 	// if err := server.ListenAndServeTLS("./pem/cert2.pem", "./pem/key2.pem"); err != nil {
+	// 	// 	log.Fatal("Server failed to start: ", err)
+	// 	// }
+	// }()
+	// go func() {
+	// 	if err := server.ListenAndServe(); err != nil {
+	// 		log.Fatal("Server failed to start: ", err)
+	// 	}
+	// }()
 
 	// 创建代理服务器处理程序
 	proxyHandler := http.HandlerFunc(handleRequest)

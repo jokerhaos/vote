@@ -27,7 +27,7 @@ func NewSendRequest(headers *http.Header, boundary string) *SendRequest {
 	}
 	return &SendRequest{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 10 * time.Second,
 		},
 		retryNum: 5,
 		headers:  headers,
@@ -42,21 +42,31 @@ func (s *SendRequest) SetHeaders(headers map[string]string) {
 	}
 }
 
-func (s *SendRequest) SetProxy(uri string) {
+func (s *SendRequest) SetProxy(proxyAddr string, t string) {
 	// 创建代理 URL
-	proxyURL, err := url.Parse(uri)
+	proxyURL, err := url.Parse(proxyAddr)
 	if err != nil {
 		fmt.Println("Failed to parse proxy URL:", err)
 		return
 	}
-
-	// 创建自定义的 Transport
-	transport := &http.Transport{
-		Proxy: http.ProxyURL(proxyURL),
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
+	var transport *http.Transport
+	if t == "socks5" {
+		proxy := func(_ *http.Request) (*url.URL, error) {
+			return url.Parse(proxyAddr)
+		}
+		transport = &http.Transport{
+			Proxy: proxy,
+		}
+	} else {
+		// 创建自定义的 Transport
+		transport = &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
 	}
+
 	s.client.Transport = transport
 }
 
