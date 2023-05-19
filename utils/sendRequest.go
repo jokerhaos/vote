@@ -26,7 +26,7 @@ func NewSendRequest(headers *http.Header, boundary string) *SendRequest {
 	}
 	return &SendRequest{
 		client: &http.Client{
-			Timeout: 8 * time.Second,
+			Timeout: 30 * time.Second,
 		},
 		retryNum: 5,
 		headers:  headers,
@@ -41,7 +41,23 @@ func (s *SendRequest) SetHeaders(headers map[string]string) {
 	}
 }
 
-func (s *SendRequest) send(method string, url string, param url.Values) ([]byte, *http.Response, error) {
+func (s *SendRequest) SetProxy(uri string) {
+	// 创建代理 URL
+	proxyURL, err := url.Parse(uri)
+	if err != nil {
+		fmt.Println("Failed to parse proxy URL:", err)
+		return
+	}
+
+	// 创建自定义的 Transport
+	transport := &http.Transport{
+		Proxy: http.ProxyURL(proxyURL),
+	}
+
+	s.client.Transport = transport
+}
+
+func (s *SendRequest) send(method string, url string, param url.Values, headers http.Header) ([]byte, *http.Response, error) {
 	reqBody := strings.NewReader(param.Encode())
 	// 设置请求参数
 	if s.boundary != "" {
@@ -67,7 +83,11 @@ func (s *SendRequest) send(method string, url string, param url.Values) ([]byte,
 	}
 
 	// 设置请求头
-	req.Header = *s.headers
+	if headers != nil {
+		req.Header = headers
+	} else {
+		req.Header = *s.headers
+	}
 
 	resp, err := s.client.Do(req)
 	if err != nil {
@@ -88,7 +108,7 @@ func (s *SendRequest) send(method string, url string, param url.Values) ([]byte,
 }
 
 func (s *SendRequest) Post(url string, param url.Values) ([]byte, *http.Response, error) {
-	return s.send("POST", url, param)
+	return s.send("POST", url, param, nil)
 }
 
 func (s *SendRequest) RepeatPost(uuid, url string, param url.Values, timeout time.Duration, num int, headers map[string]string) {
@@ -110,8 +130,8 @@ func (s *SendRequest) RepeatPost(uuid, url string, param url.Values, timeout tim
 	}
 }
 
-func (s *SendRequest) Get(url string, headers map[string]string) ([]byte, *http.Response, error) {
-	return s.send("GET", url, nil)
+func (s *SendRequest) Get(url string, headers http.Header) ([]byte, *http.Response, error) {
+	return s.send("GET", url, nil, headers)
 }
 
 // func main() {

@@ -5,17 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
+	"vote/getter"
 	"vote/utils"
 
 	"github.com/fatih/color"
 	"github.com/google/go-querystring/query"
+	"github.com/henson/proxypool/pkg/models"
 )
 
 type RequestParam struct {
@@ -100,6 +102,16 @@ func main() {
 	fmt.Printf("密码是否随机默认是，不随机请输入你想要的密码，想随机直接回车：")
 	fmt.Scanf("%s\n", &pwd)
 
+	ipChan := make(chan *models.IP, 2000)
+
+	go func() {
+		// Start getters to scraper IP and put it in channel
+		for {
+			go ipProxyRun(ipChan)
+			time.Sleep(10 * time.Minute)
+		}
+	}()
+
 	headers := &http.Header{}
 	// 设置请求头
 	headers.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryN2JsHIlOejq9WtWA")
@@ -119,6 +131,15 @@ func main() {
 	for i := 0; i < num; i++ {
 		vote := &Vote{
 			SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryN2JsHIlOejq9WtWA"),
+		}
+		// 获取代理ip
+		select {
+		case proxyIp := <-ipChan:
+			// 设置代理ip
+			proxyurl := fmt.Sprintf("%s://%s", proxyIp.Type1, proxyIp.Data)
+			fmt.Println("代理ip：", proxyurl)
+			vote.SendRequest.SetProxy(proxyurl)
+		default:
 		}
 		err := vote.setToken()
 		if err != nil {
@@ -179,19 +200,10 @@ func (selfs *Vote) setCookie(cookies []string) error {
 // 设置token
 func (selfs *Vote) setToken() error {
 	// 获取token 和 cookie
-	resp, err := http.Get("https://9entertainawards.mcot.net/vote")
+	body, resp, err := selfs.SendRequest.Get("https://9entertainawards.mcot.net/vote", http.Header{})
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return errors.New(fmt.Sprintf("状态码：%d，内容：%s", resp.StatusCode, string(body)))
-	}
-
 	compileRegex := regexp.MustCompile("\"_token\" value=\"(.*?)\">")
 	matchArr := compileRegex.FindStringSubmatch(string(body))
 	token := matchArr[len(matchArr)-1]
@@ -266,4 +278,46 @@ func (selfs *Vote) vote(id int) error {
 	color.Green("o(*￣▽￣*)ブ 投票 %d号 成功 o(*￣▽￣*)ブ \r\n", id)
 	logger.Println(fmt.Sprintf("账号:%s,密码:%s,投票 %d 号成功:", selfs.Email, selfs.Password, id))
 	return nil
+}
+
+// 扫描代理IP
+func ipProxyRun(ipChan chan<- *models.IP) {
+	var wg sync.WaitGroup
+	funs := []func() []*models.IP{
+		// getter.FQDL,  //新代理 404了
+		getter.PZZQZ, //新代理
+		//getter.Data5u,
+		//getter.Feiyi,
+		//getter.IP66, //need to remove it
+		getter.IP3306,
+		getter.KDL,
+		//getter.GBJ,	//因为网站限制，无法正常下载数据
+		//getter.Xici,
+		//getter.XDL,
+		//getter.IP181,  // 已经无法使用
+		//getter.YDL,	//失效的采集脚本，用作系统容错实验
+		// getter.PLP, //need to remove it
+		getter.PLPSSL,
+		getter.IP89,
+	}
+	for _, f := range funs {
+		wg.Add(1)
+		go func(f func() []*models.IP) {
+			defer func() {
+				if r := recover(); r != nil {
+					// 在这里处理panic异常
+					// fmt.Println("捕获到panic异常:", r)
+				}
+			}()
+			temp := f()
+			//log.Println("[run] get into loop")
+			for _, v := range temp {
+				// log.Println("[run] len of ipChan %v", v)
+				ipChan <- v
+			}
+			wg.Done()
+		}(f)
+	}
+	wg.Wait()
+	log.Println("All getters finished.")
 }
