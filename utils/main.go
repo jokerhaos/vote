@@ -16,7 +16,7 @@ func ParseCookieString(rawCookies string) (*http.Request, error) {
 	return req, err
 }
 
-var bytes []byte = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890")
+// var utilsBytesSeed []byte = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890")
 
 func init() {
 	// 保证每次生成的随机数不一样

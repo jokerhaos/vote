@@ -2,13 +2,11 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"regexp"
@@ -43,7 +41,18 @@ type VoteResponseParam struct {
 	Result bool   `json:"result"`
 }
 
+type Vote struct {
+	Token       string
+	Cookies     []*http.Cookie
+	CookieStr   string
+	Phpsessid   *http.Cookie
+	Email       string
+	Password    string
+	SendRequest *utils.SendRequest
+}
+
 var logger *log.Logger
+var colorPrint = color.New()
 
 func init() {
 	directory := "logs"
@@ -67,6 +76,7 @@ func init() {
 	logger = log.New(logFile, "[info]", log.Ltime)
 }
 func main() {
+
 	//接收用户的选择
 	var id int
 	var num int
@@ -90,40 +100,52 @@ func main() {
 	fmt.Printf("密码是否随机默认是，不随机请输入你想要的密码，想随机直接回车：")
 	fmt.Scanf("%s\n", &pwd)
 
+	headers := &http.Header{}
+	// 设置请求头
+	headers.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryN2JsHIlOejq9WtWA")
+	headers.Set("Accept", "*/*")
+	headers.Set("Accept-Language", "zh-CN,zh;q=0.9")
+	headers.Set("Cache-Control", "no-cache")
+	headers.Set("Pragma", "no-cache")
+	headers.Set("Sec-Ch-Ua", "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"")
+	headers.Set("Sec-Ch-Ua-Mobile", "?1")
+	headers.Set("Sec-Ch-Ua-Platform", "\"Android\"")
+	headers.Set("Sec-Fetch-Dest", "empty")
+	headers.Set("Sec-Fetch-Mode", "cors")
+	headers.Set("Sec-Fetch-Site", "same-origin")
+	headers.Set("X-Requested-With", "XMLHttpRequest")
+	headers.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	// 开始进行投票
 	for i := 0; i < num; i++ {
-		vote := &Vote{}
+		vote := &Vote{
+			SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryN2JsHIlOejq9WtWA"),
+		}
 		err := vote.setToken()
 		if err != nil {
-			fmt.Println("获取cookie报错咯:", err)
-			return
+			colorPrint.Add(color.FgRed)
+			colorPrint.Println("获取cookie报错咯:", err)
+			continue
 		}
 		// fmt.Println("Token:", vote.Token)
 		// fmt.Println("Cookie:", vote.Cookies)
 		err = vote.register(pwd)
 		if err != nil {
-			fmt.Println("注册账号报错咯:", err)
-			return
+			colorPrint.Add(color.FgRed)
+			colorPrint.Println("注册账号报错咯:", err)
+			continue
 		}
 		err = vote.vote(id)
 		if err != nil {
-			fmt.Println("投票报错咯:", err)
-			return
+			colorPrint.Add(color.FgRed)
+			colorPrint.Println("投票报错咯:", err)
+			continue
 		}
-		fmt.Println("======本轮投票结束进行下一次投票======\r\n")
+		fmt.Println("======本轮投票结束进行下一次投票======")
 		time.Sleep(time.Second * time.Duration(gap))
 	}
 
 	fmt.Printf("投票结束了，60秒后自动关闭窗口，投给 %d 号明星，总共投票次数：%d \r\n", id, num)
 	time.Sleep(time.Second * 60)
-}
-
-type Vote struct {
-	Token     string
-	Cookies   []*http.Cookie
-	CookieStr string
-	Phpsessid *http.Cookie
-	Email     string
-	Password  string
 }
 
 func (selfs *Vote) setCookie(cookies []string) error {
@@ -140,19 +162,17 @@ func (selfs *Vote) setCookie(cookies []string) error {
 	}
 	xsrftoken, _ := req.Cookie("XSRF-TOKEN")
 	laravel_session, _ := req.Cookie("laravel_session")
-	// fmt.Println("===========")
-	// fmt.Println(phpsessid.Value)
-	// fmt.Println(xsrftoken.Value)
-	// fmt.Println(laravel_session.Value)
-
 	cookieStr := fmt.Sprintf("PHPSESSID=%s; XSRF-TOKEN=%s; laravel_session=%s", selfs.Phpsessid.Value, xsrftoken.Value, laravel_session.Value)
+	selfs.SendRequest.SetHeaders(map[string]string{
+		"Cookie": cookieStr,
+	})
 	// fmt.Println("cookieStr:", cookieStr)
-	selfs.CookieStr = cookieStr
-	cookies2 := make([]*http.Cookie, 3)
-	cookies2 = append(cookies2, selfs.Phpsessid)
-	cookies2 = append(cookies2, xsrftoken)
-	cookies2 = append(cookies2, laravel_session)
-	selfs.Cookies = cookies2
+	// selfs.CookieStr = cookieStr
+	// cookies2 := make([]*http.Cookie, 3)
+	// cookies2 = append(cookies2, selfs.Phpsessid)
+	// cookies2 = append(cookies2, xsrftoken)
+	// cookies2 = append(cookies2, laravel_session)
+	// selfs.Cookies = cookies2
 	return nil
 }
 
@@ -193,102 +213,22 @@ func (selfs *Vote) register(pwd string) error {
 		opt.PASSWORD = pwd
 	}
 	data, _ := query.Values(opt)
-	fmt.Println("请求参数:", data.Encode())
-
-	// 创建请求体
-	reqBody := &bytes.Buffer{}
-	writer := multipart.NewWriter(reqBody)
-
-	// 设置分割符号（boundary）
-	writer.SetBoundary("----WebKitFormBoundaryN2JsHIlOejq9WtWA")
-
-	// 添加表单字段到请求体
-	for key, value := range data {
-		for _, v := range value {
-			_ = writer.WriteField(key, v)
-		}
-	}
-	// 关闭 multipart.Writer，以写入结尾标识符
-	_ = writer.Close()
-
-	// reqBody := strings.NewReader("_token=" + selfs.Token + "&email=gfuiasdgkjs16@gmail.com&password=aa123123")
-	// boundary := "------WebKitFormBoundaryN2JsHIlOejq9WtWA"
-	// reqBody := strings.NewReader("\r\n" + boundary +
-	// 	"Content-Disposition: form-data; name=\"email\"\r\n\r\n" +
-	// 	"gfuiasdgkjs16@gmail.com\r\n" +
-	// 	"------WebKitFormBoundaryN2JsHIlOejq9WtWA\r\n" +
-	// 	"Content-Disposition: form-data; name=\"password\"\r\n\r\n" +
-	// 	"aa123123\r\n" +
-	// 	"------WebKitFormBoundaryN2JsHIlOejq9WtWA\r\n" +
-	// 	"Content-Disposition: form-data; name=\"_token\"\r\n\r\n" +
-	// 	selfs.Token + "\r\n" +
-	// 	"------WebKitFormBoundaryN2JsHIlOejq9WtWA--\r\n")
-
-	// urlValues := url.Values{}
-	// urlValues.Add("_token", selfs.Token)
-	// urlValues.Add("password", "aa123123")
-	// urlValues.Add("email", "gfuiasdgkjs16@gmail.com")
-	// fmt.Println("请求参数:", urlValues.Encode())
-	// reqBody := strings.NewReader(urlValues.Encode())
-
-	//生成post请求
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", "https://9entertainawards.mcot.net/register", reqBody)
+	// 进行请求
+	responseBody, resp, err := selfs.SendRequest.Post("https://9entertainawards.mcot.net/register", data)
 	if err != nil {
 		return err
 	}
-	// 设置请求头
-	req.Header.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryN2JsHIlOejq9WtWA")
-	req.Header.Set("Accept", "*/*")
-	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
-	req.Header.Set("Cache-Control", "no-cache")
-	req.Header.Set("Pragma", "no-cache")
-	req.Header.Set("Sec-Ch-Ua", "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"")
-	req.Header.Set("Sec-Ch-Ua-Mobile", "?1")
-	req.Header.Set("Sec-Ch-Ua-Platform", "\"Android\"")
-	req.Header.Set("Sec-Fetch-Dest", "empty")
-	req.Header.Set("Sec-Fetch-Mode", "cors")
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("Referer", "https://9entertainawards.mcot.net/register")
-	req.Header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-	req.Header.Set("Cookie", selfs.CookieStr)
-
-	// 设置cookie
-	// for _, v := range selfs.Cookies {
-	// 	req.AddCookie(v)
-	// }
-
-	//Do方法发送请求
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != 200 {
-		return errors.New(fmt.Sprintf("注册状态码异常:%d", resp.StatusCode))
-	}
-
-	defer resp.Body.Close()
-	responseBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(responseBody))
-
+	// 接受请求参数
 	response := &ResponseParam{}
 	json.Unmarshal(responseBody, &response)
 	if response.Code != 200 {
 		return errors.New(response.Message)
 	}
 	fmt.Println("注册成功,账号：", opt.EMAIL, "密码：", opt.PASSWORD)
-
-	cookies := resp.Header["Set-Cookie"]
-	selfs.setCookie(cookies)
-
+	// 重新设置cookie
+	selfs.setCookie(resp.Header["Set-Cookie"])
 	selfs.Email = opt.EMAIL
 	selfs.Password = opt.PASSWORD
-
 	return nil
 }
 
@@ -304,64 +244,20 @@ func (selfs *Vote) vote(id int) error {
 	data, _ := query.Values(opt)
 	fmt.Println("请求参数:", data.Encode())
 
-	// 创建请求体
-	reqBody := &bytes.Buffer{}
-	writer := multipart.NewWriter(reqBody)
-
-	// 设置分割符号（boundary）
-	writer.SetBoundary("----WebKitFormBoundaryN2JsHIlOejq9WtWA")
-
-	// 添加表单字段到请求体
-	for key, value := range data {
-		for _, v := range value {
-			_ = writer.WriteField(key, v)
-		}
-	}
-	// 关闭 multipart.Writer，以写入结尾标识符
-	_ = writer.Close()
-
-	//生成post请求
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", "https://9entertainawards.mcot.net/vote/vote", reqBody)
+	// 进行请求
+	responseBody, _, err := selfs.SendRequest.Post("https://9entertainawards.mcot.net/vote/vote", data)
 	if err != nil {
 		return err
 	}
-	// 设置请求头
-	req.Header.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryN2JsHIlOejq9WtWA")
-	req.Header.Set("Cookie", selfs.CookieStr)
-
-	// 设置cookie
-	// for _, v := range selfs.Cookies {
-	// 	req.AddCookie(v)
-	// }
-
-	//Do方法发送请求
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode != 200 {
-		return errors.New(fmt.Sprintf("投票状态码异常:%d", resp.StatusCode))
-	}
-
-	defer resp.Body.Close()
-	responseBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(responseBody))
-
+	// 接受请求参数
+	// fmt.Println(string(responseBody))
 	response := &VoteResponseParam{}
 	json.Unmarshal(responseBody, &response)
-	colorPrint := color.New()
-
 	if !response.Result {
-		colorPrint.Add(color.FgRed) // 红色文字
-		colorPrint.Println("￣へ￣ 投票失败 ￣へ￣")
+		color.Red("￣へ￣ 投票失败 ￣へ￣ \r\n")
 		return errors.New(string(responseBody))
 	}
-	colorPrint.Add(color.FgGreen)
-	colorPrint.Printf("o(*￣▽￣*)ブ 投票 %d号 成功 o(*￣▽￣*)ブ \r\n", id)
+	color.Green("o(*￣▽￣*)ブ 投票 %d号 成功 o(*￣▽￣*)ブ \r\n", id)
 	logger.Println(fmt.Sprintf("账号:%s,密码:%s,投票 %d 号成功:", selfs.Email, selfs.Password, id))
 	return nil
 }

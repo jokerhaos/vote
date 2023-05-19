@@ -1,101 +1,117 @@
 package utils
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
 
-type sendRequest struct {
-	client *http.Client
+type SendRequest struct {
+	client   *http.Client
+	retryNum int // 重试次数
+	headers  *http.Header
+	boundary string
 }
 
-func NewSendRequest() *sendRequest {
-	return &sendRequest{
+func NewSendRequest(headers *http.Header, boundary string) *SendRequest {
+	if headers == nil {
+		headers = &http.Header{}
+		headers.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+	return &SendRequest{
 		client: &http.Client{
 			Timeout: 8 * time.Second,
 		},
+		retryNum: 5,
+		headers:  headers,
+		boundary: boundary,
 	}
 }
 
-func (s *sendRequest) Post(url string, param url.Values, headers map[string]string) (string, error) {
-	req, err := http.NewRequest("POST", url, strings.NewReader(param.Encode()))
+func (s *SendRequest) SetHeaders(headers map[string]string) {
+	// 设置请求头
+	for key, value := range headers {
+		s.headers.Set(key, value)
+	}
+}
+
+func (s *SendRequest) send(method string, url string, param url.Values) ([]byte, *http.Response, error) {
+	reqBody := strings.NewReader(param.Encode())
+	// 设置请求参数
+	if s.boundary != "" {
+		// 创建请求体
+		buf := &bytes.Buffer{}
+		writer := multipart.NewWriter(buf)
+		// 设置分割符号（boundary）
+		writer.SetBoundary(s.boundary)
+		// 添加表单字段到请求体
+		for key, value := range param {
+			for _, v := range value {
+				_ = writer.WriteField(key, v)
+			}
+		}
+		// 关闭 multipart.Writer，以写入结尾标识符
+		_ = writer.Close()
+		reqBody = strings.NewReader(buf.String())
+	}
+
+	req, err := http.NewRequest(method, url, reqBody)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
 	// 设置请求头
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
+	req.Header = *s.headers
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Sprintf("状态码：%d，内容：%s", resp.StatusCode, string(body)), nil
+		return nil, nil, errors.New(fmt.Sprintf("状态码：%d，内容：%s", resp.StatusCode, string(body)))
 	}
 
-	return string(body), nil
+	return body, resp, nil
 }
 
-func (s *sendRequest) RepeatPost(uuid, url string, param url.Values, timeout time.Duration, num int, headers map[string]string) {
+func (s *SendRequest) Post(url string, param url.Values) ([]byte, *http.Response, error) {
+	return s.send("POST", url, param)
+}
+
+func (s *SendRequest) RepeatPost(uuid, url string, param url.Values, timeout time.Duration, num int, headers map[string]string) {
 	time.Sleep(timeout)
 
 	fmt.Printf("[%s][%d]请求地址：%s\n", uuid, num, url)
 	fmt.Printf("[%s][%d]本次发送：%v\n", uuid, num, param)
 
-	result, err := s.Post(url, param, headers)
+	result, _, err := s.Post(url, param)
 	if err != nil {
 		fmt.Printf("[%s][%d]请求返回错误：%v\n", uuid, num, err)
 		return
 	}
 	fmt.Printf("[%s][%d]请求返回：%s\n", uuid, num, result)
 
-	if result != "success" && num < 5 {
+	if string(result) != "success" && num < 5 {
 		// 进行重发
 		s.RepeatPost(uuid, url, param, timeout*2, num+1, headers)
 	}
 }
 
-func (s *sendRequest) Get(url string, headers map[string]string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-
-	// 设置请求头
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("状态码：%d，内容：%s", resp.StatusCode, string(body))
-	}
-
-	return string(body), nil
+func (s *SendRequest) Get(url string, headers map[string]string) ([]byte, *http.Response, error) {
+	return s.send("GET", url, nil)
 }
 
 // func main() {
