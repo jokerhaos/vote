@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"golang.org/x/net/proxy"
 )
 
 type SendRequest struct {
@@ -51,12 +53,23 @@ func (s *SendRequest) SetProxy(proxyAddr string, t string) {
 	}
 	var transport *http.Transport
 	if t == "socks5" {
-		proxy := func(_ *http.Request) (*url.URL, error) {
-			return url.Parse(proxyAddr)
+		dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
+		if err != nil {
+			fmt.Println("Failed to create proxy dialer:", err)
+			return
 		}
+
+		// 创建自定义的 HTTP 客户端，使用 SOCKS5 代理进行请求
 		transport = &http.Transport{
-			Proxy: proxy,
+			Dial: dialer.Dial,
 		}
+
+		// proxy := func(_ *http.Request) (*url.URL, error) {
+		// 	return url.Parse(proxyAddr)
+		// }
+		// transport = &http.Transport{
+		// 	Proxy: proxy,
+		// }
 	} else {
 		// 创建自定义的 Transport
 		transport = &http.Transport{
