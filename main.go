@@ -214,10 +214,6 @@ func (selfs *Vote) setToken() error {
 	selfs.setCookie(cookies)
 	// fmt.Println("token:", token)
 	// fmt.Println("cookie:", cookie)
-
-	if resp.StatusCode != 200 {
-		return errors.New(fmt.Sprintf("请求首页状态码异常:%d", resp.StatusCode))
-	}
 	return nil
 }
 
