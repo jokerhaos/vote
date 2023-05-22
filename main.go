@@ -125,8 +125,10 @@ func main() {
 	headers.Set("Sec-Fetch-Site", "same-origin")
 	headers.Set("X-Requested-With", "XMLHttpRequest")
 	headers.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	success := 0
+	total := 0
 	// 开始进行投票
-	for i := 0; i < num; i++ {
+	for success < num {
 		vote := &Vote{
 			SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryN2JsHIlOejq9WtWA"),
 		}
@@ -139,6 +141,7 @@ func main() {
 			vote.SendRequest.SetProxy(proxyurl, "socks")
 		default:
 		}
+		total++
 		err := vote.setToken()
 		if err != nil {
 			colorPrint.Add(color.FgRed)
@@ -160,10 +163,11 @@ func main() {
 			continue
 		}
 		fmt.Println("======本轮投票结束进行下一次投票======")
+		success++
 		time.Sleep(time.Second * time.Duration(gap))
 	}
 
-	fmt.Printf("投票结束了，60秒后自动关闭窗口，投给 %d 号明星，总共投票次数：%d \r\n", id, num)
+	fmt.Printf("投票结束了，60秒后自动关闭窗口，投给 %d 号明星，总共投票次数：%d ，成功投票：%d\r\n", id, total, success)
 	time.Sleep(time.Second * 60)
 }
 
@@ -274,7 +278,7 @@ func (selfs *Vote) vote(id int) error {
 		return errors.New(string(responseBody))
 	}
 	color.Green("o(*￣▽￣*)ブ 投票 %d号 成功 o(*￣▽￣*)ブ \r\n", id)
-	logger.Println(fmt.Sprintf("账号:%s,密码:%s,投票 %d 号成功:", selfs.Email, selfs.Password, id))
+	logger.Println(fmt.Sprintf("账号:%s,密码:%s,投票 %d 号成功", selfs.Email, selfs.Password, id))
 	return nil
 }
 

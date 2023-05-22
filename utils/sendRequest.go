@@ -29,7 +29,7 @@ func NewSendRequest(headers *http.Header, boundary string) *SendRequest {
 	}
 	return &SendRequest{
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: 30 * time.Second,
 		},
 		retryNum: 5,
 		headers:  headers,
