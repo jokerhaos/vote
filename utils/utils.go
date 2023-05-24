@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -70,6 +71,23 @@ func ParseLogEntry(logEntry string) map[string]string {
 		}
 	}
 	return result
+}
+
+func GenerateRandomBoundary() (string, error) {
+	// 生成随机的 16 字节
+	randomBytes := make([]byte, 16)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	// 将随机字节转换为 base64 编码的字符串
+	boundary := base64.RawURLEncoding.EncodeToString(randomBytes)
+
+	// 使用特定前缀，以确保 boundary 的格式符合要求
+	boundary = "----WebKitFormBoundary" + boundary
+
+	return boundary, nil
 }
 
 func IndexOf(targetString string) bool {

@@ -47,13 +47,14 @@ type VoteResponseParam struct {
 }
 
 type Vote struct {
-	Token       string
-	Cookies     []*http.Cookie
-	CookieStr   string
-	Phpsessid   *http.Cookie
-	Email       string
-	Password    string
-	SendRequest *utils.SendRequest
+	Token         string
+	Cookies       []*http.Cookie
+	CookieStr     string
+	Phpsessid     *http.Cookie
+	LaravelSessid *http.Cookie
+	Email         string
+	Password      string
+	SendRequest   *utils.SendRequest
 }
 
 var logger *log.Logger
@@ -117,7 +118,7 @@ func main() {
 	fmt.Printf("请输入停顿时间,单位毫秒,默认10000毫秒：")
 	fmt.Scanf("%d\n", &gap)
 	if gap == 0 {
-		gap = 10000
+		gap = 1000
 	}
 
 	fmt.Printf("是否自动注册，默认不自动注册，自动注册请输入“ 1 ”：")
@@ -194,31 +195,33 @@ func main() {
 		gap = 10
 	}
 
-	ipChan := make(chan *models.IP, 1000)
-	go func() {
-		// Start getters to scraper IP and put it in channel
-		for {
-			go ipProxyRun(ipChan)
-			time.Sleep(10 * time.Minute)
-		}
-	}()
+	ipChan := make(chan *models.IP, 1)
+	// go func() {
+	// 	// Start getters to scraper IP and put it in channel
+	// 	for {
+	// 		go ipProxyRun(ipChan)
+	// 		time.Sleep(10 * time.Minute)
+	// 	}
+	// }()
 	// fmt.Println(userData)
 	// time.Sleep(time.Second * 15)
 	headers := &http.Header{}
 	// 设置请求头
-	headers.Set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-	headers.Set("accept-language", "zh-CN,zh;q=0.9")
-	headers.Set("cache-control", "no-cache")
-	headers.Set("pragma", "no-cache")
-	headers.Set("sec-ch-ua", "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"")
-	headers.Set("sec-ch-ua-mobile", "?0")
-	headers.Set("sec-ch-ua-platform", "\"Windows\"")
-	headers.Set("sec-fetch-dest", "document")
-	headers.Set("sec-fetch-mode", "navigate")
-	headers.Set("sec-fetch-site", "none")
-	headers.Set("sec-fetch-user", "?1")
-	headers.Set("upgrade-insecure-requests", "1")
-	headers.Set("referrerPolicy", "strict-origin-when-cross-origin")
+	headers.Add("authority", "9entertainawards.mcot.net")
+	headers.Add("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	headers.Add("accept-language", "zh-CN,zh;q=0.9")
+	headers.Add("cache-control", "no-cache")
+	headers.Add("pragma", "no-cache")
+	// headers.Add("referer", "https://9entertainawards.mcot.net/")
+	headers.Add("sec-ch-ua", "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"")
+	headers.Add("sec-ch-ua-mobile", "?0")
+	headers.Add("sec-ch-ua-platform", "\"Windows\"")
+	headers.Add("sec-fetch-dest", "document")
+	headers.Add("sec-fetch-mode", "navigate")
+	headers.Add("sec-fetch-site", "same-origin")
+	headers.Add("sec-fetch-user", "?1")
+	headers.Add("upgrade-insecure-requests", "1")
+	headers.Add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36")
 	success := 0
 	total := 0
 	var wg sync.WaitGroup
@@ -228,11 +231,12 @@ func main() {
 			time.Sleep(time.Millisecond * time.Duration(gap))
 		}
 		// 算了因为我是分钟收费ip，特殊情况特殊处理一下……
-		// ipProxyRun(ipChan)
+		// go ipProxyRun(ipChan)
 		headers.Set("User-Agent", utils.GenerateUserAgent())
-		headers.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryIxwj5hbrEYmmpCOc")
+		boundary, _ := utils.GenerateRandomBoundary()
+		headers.Set("Content-Type", "multipart/form-data; boundary="+boundary)
 		vote := &Vote{
-			SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryIxwj5hbrEYmmpCOc"),
+			SendRequest: utils.NewSendRequest(headers, boundary),
 		}
 		// 获取代理ip
 		select {
@@ -258,7 +262,7 @@ func main() {
 				if user != nil {
 					time.Sleep(time.Second * 10)
 					f(total, &Vote{
-						SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryIxwj5hbrEYmmpCOc"),
+						SendRequest: utils.NewSendRequest(headers, boundary),
 					}, f)
 				}
 				return
@@ -279,7 +283,7 @@ func main() {
 					color.Red("投票情况，总投：%d，登录失败咯：%s\r\n", success, err)
 					time.Sleep(time.Second * 10)
 					f(total, &Vote{
-						SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryIxwj5hbrEYmmpCOc"),
+						SendRequest: utils.NewSendRequest(headers, boundary),
 					}, f)
 					return
 				}
@@ -304,14 +308,15 @@ func main() {
 				// }, f)
 				return
 			}
-			fmt.Println("======本轮投票结束进行下一次投票======")
 			success++
+			fmt.Printf("======本轮投票结束进行下一次投票 当前投了 %d 票======\r\n", success)
 		}
-		go func(total int, vote *Vote) {
-			defer wg.Done()
-			f(total, vote, f)
-		}(total, vote)
-
+		// go func(total int, vote *Vote) {
+		// 	defer wg.Done()
+		// 	f(total, vote, f)
+		// }(total, vote)
+		f(total, vote, f)
+		wg.Done()
 	}
 	wg.Wait()
 	fmt.Printf("投票结束了，60秒后自动关闭窗口，投给 %d 号明星，总共投票次数：%d ，成功投票：%d\r\n", id, total, success)
@@ -327,12 +332,21 @@ func (selfs *Vote) setCookie(cookies []string) error {
 	// fmt.Println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 	// fmt.Println(strings.Join(cookies, ";"))
 	if selfs.Phpsessid == nil || selfs.Phpsessid.Value == "" {
-		phpsessid, _ := req.Cookie("PHPSESSID")
+		phpsessid, err := req.Cookie("PHPSESSID")
 		selfs.Phpsessid = phpsessid
+		if err != nil {
+			selfs.Phpsessid = &http.Cookie{}
+		}
+	}
+	if selfs.LaravelSessid == nil || selfs.LaravelSessid.Value == "" {
+		laravel_session, err := req.Cookie("laravel_session")
+		selfs.LaravelSessid = laravel_session
+		if err != nil {
+			selfs.LaravelSessid = &http.Cookie{}
+		}
 	}
 	xsrftoken, _ := req.Cookie("XSRF-TOKEN")
-	laravel_session, _ := req.Cookie("laravel_session")
-	cookieStr := fmt.Sprintf("PHPSESSID=%s; XSRF-TOKEN=%s; laravel_session=%s", selfs.Phpsessid.Value, xsrftoken.Value, laravel_session.Value)
+	cookieStr := fmt.Sprintf("PHPSESSID=%s; XSRF-TOKEN=%s; laravel_session=%s", selfs.Phpsessid.Value, xsrftoken.Value, selfs.LaravelSessid.Value)
 	selfs.SendRequest.SetHeaders(map[string]string{
 		"Cookie": cookieStr,
 	})
@@ -350,6 +364,24 @@ func (selfs *Vote) setCookie(cookies []string) error {
 func (selfs *Vote) setToken() error {
 	// 获取token 和 cookie
 	body, resp, err := selfs.SendRequest.Get("https://9entertainawards.mcot.net/vote", http.Header{})
+	if err != nil {
+		return err
+	}
+	compileRegex := regexp.MustCompile("\"_token\" value=\"(.*?)\">")
+	matchArr := compileRegex.FindStringSubmatch(string(body))
+	token := matchArr[len(matchArr)-1]
+	selfs.Token = token
+	cookies := resp.Header["Set-Cookie"]
+	selfs.setCookie(cookies)
+	// fmt.Println("token:", token)
+	// fmt.Println("cookie:", cookie)
+	return nil
+}
+
+// 设置token
+func (selfs *Vote) setToken2() error {
+	// 获取token 和 cookie
+	body, resp, err := selfs.SendRequest.Get("https://9entertainawards.mcot.net", http.Header{})
 	if err != nil {
 		return err
 	}
@@ -389,6 +421,9 @@ func (selfs *Vote) login(email string, pwd string) error {
 	fmt.Println("登录成功,账号：", email, "密码：", pwd)
 	// 重新设置cookie
 	selfs.setCookie(resp.Header["Set-Cookie"])
+
+	selfs.setToken2()
+
 	selfs.Email = email
 	selfs.Password = pwd
 	return nil
@@ -463,11 +498,11 @@ func (selfs *Vote) vote(id int) error {
 func ipProxyRun(ipChan chan<- *models.IP) {
 	var wg sync.WaitGroup
 	funs := []func() []*models.IP{
-		getter.PZZQZ, //新代理
-		getter.IP66,  //need to remove it
-		getter.IP89,
-		getter.Geonode,
-		// getter.Hsk,
+		// getter.PZZQZ, //新代理
+		// getter.IP66,  //need to remove it
+		// getter.IP89,
+		// getter.Geonode,
+		getter.Hsk,
 		// getter.IP3306,
 		// getter.FQDL,  //新代理 404了
 		//getter.Data5u,

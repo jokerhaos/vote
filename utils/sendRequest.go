@@ -110,7 +110,7 @@ func (s *SendRequest) send(method string, url string, param url.Values, headers 
 	}
 
 	// 设置请求头
-	if headers != nil {
+	if headers != nil && len(headers) > 0 {
 		req.Header = headers
 	} else {
 		req.Header = *s.headers

@@ -47,6 +47,9 @@ func s() {
 	var wg sync.WaitGroup
 	funs := []func() []*models.IP{
 		getter.PZZQZ, //新代理
+		getter.IP66,  //need to remove it
+		getter.IP89,
+		getter.Geonode,
 		// getter.IP66,  //need to remove it
 		// getter.IP89,
 		// getter.Geonode,
@@ -96,6 +99,7 @@ func s() {
 				}
 				// fmt.Printf("%s:%s", v.Type1, v.Data)
 				// }
+				setIp(v.Type1 + "://" + v.Data)
 			}
 			wg.Done()
 		}(f)
