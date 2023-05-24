@@ -13,3 +13,4 @@
 .env
 .user.ini
 *.exe
+*.xlsx

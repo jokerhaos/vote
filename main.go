@@ -118,7 +118,8 @@ func main() {
 		// 打开 Excel 文件
 		f, err := excelize.OpenFile(userPath)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println("无法打开文件:", err)
+			return
 		}
 
 		// 选择要读取的工作表
