@@ -19,7 +19,7 @@ func IP66() (result []*models.IP) {
 	pollURL := "http://www.66ip.cn/mo.php?tqsl=100"
 	resp, err := http.Get(pollURL)
 	if err != nil {
-		log.Println(err)
+		// clog.Warn("66ip:", err.Error())
 		return
 	}
 
@@ -41,6 +41,6 @@ func IP66() (result []*models.IP) {
 		result = append(result, ip)
 	}
 
-	clog.Info("IP66 done.")
+	// clog.Info("IP66 done.")
 	return
 }

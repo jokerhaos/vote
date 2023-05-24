@@ -194,31 +194,31 @@ func main() {
 		gap = 10
 	}
 
-	ipChan := make(chan *models.IP, 1)
-	// go func() {
-	// 	// Start getters to scraper IP and put it in channel
-	// 	for {
-	// 		go ipProxyRun(ipChan)
-	// 		time.Sleep(10 * time.Minute)
-	// 	}
-	// }()
+	ipChan := make(chan *models.IP, 1000)
+	go func() {
+		// Start getters to scraper IP and put it in channel
+		for {
+			go ipProxyRun(ipChan)
+			time.Sleep(10 * time.Minute)
+		}
+	}()
 	// fmt.Println(userData)
 	// time.Sleep(time.Second * 15)
 	headers := &http.Header{}
 	// 设置请求头
-	headers.Set("Accept", "*/*")
-	headers.Set("Accept-Language", "zh-CN,zh;q=0.9")
-	headers.Set("Cache-Control", "no-cache")
-	headers.Set("Pragma", "no-cache")
-	headers.Set("Sec-Ch-Ua", "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"")
-	headers.Set("Sec-Ch-Ua-Mobile", "?0")
-	headers.Set("Sec-Ch-Ua-Platform", "\"Windows\"")
-	headers.Set("Sec-Fetch-Dest", "empty")
-	headers.Set("Sec-Fetch-Mode", "cors")
-	headers.Set("Sec-Fetch-Site", "same-origin")
-	headers.Set("X-Requested-With", "XMLHttpRequest")
-	headers.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-	headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36")
+	headers.Set("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	headers.Set("accept-language", "zh-CN,zh;q=0.9")
+	headers.Set("cache-control", "no-cache")
+	headers.Set("pragma", "no-cache")
+	headers.Set("sec-ch-ua", "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"")
+	headers.Set("sec-ch-ua-mobile", "?0")
+	headers.Set("sec-ch-ua-platform", "\"Windows\"")
+	headers.Set("sec-fetch-dest", "document")
+	headers.Set("sec-fetch-mode", "navigate")
+	headers.Set("sec-fetch-site", "none")
+	headers.Set("sec-fetch-user", "?1")
+	headers.Set("upgrade-insecure-requests", "1")
+	headers.Set("referrerPolicy", "strict-origin-when-cross-origin")
 	success := 0
 	total := 0
 	var wg sync.WaitGroup
@@ -228,8 +228,8 @@ func main() {
 			time.Sleep(time.Millisecond * time.Duration(gap))
 		}
 		// 算了因为我是分钟收费ip，特殊情况特殊处理一下……
-		ipProxyRun(ipChan)
-
+		// ipProxyRun(ipChan)
+		headers.Set("User-Agent", utils.GenerateUserAgent())
 		headers.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryIxwj5hbrEYmmpCOc")
 		vote := &Vote{
 			SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryIxwj5hbrEYmmpCOc"),
@@ -463,22 +463,23 @@ func (selfs *Vote) vote(id int) error {
 func ipProxyRun(ipChan chan<- *models.IP) {
 	var wg sync.WaitGroup
 	funs := []func() []*models.IP{
+		getter.PZZQZ, //新代理
+		getter.IP66,  //need to remove it
+		getter.IP89,
+		getter.Geonode,
+		// getter.Hsk,
+		// getter.IP3306,
 		// getter.FQDL,  //新代理 404了
-		// getter.PZZQZ, //新代理 不稳定都是超时的
 		//getter.Data5u,
-		//getter.Feiyi,
-		//getter.IP66, //need to remove it
-		// getter.IP3306, // 不稳定都是超时的
+		// getter.Feiyi,
 		// getter.KDL,
 		//getter.GBJ,	//因为网站限制，无法正常下载数据
-		//getter.Xici,
+		// getter.Xici,
 		//getter.XDL,
 		//getter.IP181,  // 已经无法使用
 		//getter.YDL,	//失效的采集脚本，用作系统容错实验
 		// getter.PLP, //need to remove it
 		// getter.PLPSSL,
-		// getter.IP89,
-		getter.Hsk,
 	}
 	for _, f := range funs {
 		wg.Add(1)
@@ -494,6 +495,23 @@ func ipProxyRun(ipChan chan<- *models.IP) {
 			for _, v := range temp {
 				// log.Println("[run] len of ipChan %v", v)
 				// if v.Type1 == "https" {
+				// ip验证是否有效
+				sendRequest := utils.NewSendRequest(nil, "")
+				if v.Type1 == "" {
+					v.Type1 = "socks5"
+				}
+				sendRequest.SetProxy(v.Type1+"://"+v.Data, v.Type1)
+				_, _, err := sendRequest.Get("https://myip.top", nil)
+				if err != nil && v.Type2 != "" {
+					sendRequest.SetProxy(v.Type2+"://"+v.Data, v.Type2)
+					v.Type1 = v.Type2
+					_, _, err = sendRequest.Get("https://myip.top", nil)
+				}
+				if err != nil {
+					// fmt.Println("不可用：", proxyAddr)
+					return
+				}
+				// fmt.Printf("%s:%s", v.Type1, v.Data)
 				ipChan <- v
 				// }
 			}

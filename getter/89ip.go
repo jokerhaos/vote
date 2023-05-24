@@ -13,7 +13,7 @@ import (
 	"github.com/henson/proxypool/pkg/models"
 )
 
-//IP89 get ip from www.89ip.cn
+// IP89 get ip from www.89ip.cn
 func IP89() (result []*models.IP) {
 	clog.Info("89IP] start test")
 	var ExprIP = regexp.MustCompile(`((25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))\.){3}(25[0-5]|2[0-4]\d|((1\d{2})|([1-9]?\d)))\:([0-9]+)`)
@@ -21,7 +21,7 @@ func IP89() (result []*models.IP) {
 
 	resp, err := http.Get(pollURL)
 	if err != nil {
-		clog.Warn(err.Error())
+		// clog.Warn("89ip:", err.Error())
 		return
 	}
 
@@ -43,6 +43,6 @@ func IP89() (result []*models.IP) {
 		result = append(result, ip)
 	}
 
-	clog.Info("89IP done.")
+	// clog.Info("89IP done.")
 	return
 }

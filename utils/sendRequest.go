@@ -53,7 +53,7 @@ func (s *SendRequest) SetProxy(proxyAddr string, t string) {
 		return
 	}
 	var transport *http.Transport
-	if t == "socks5" {
+	if strings.Contains(t, "socks") {
 		dialer, err := proxy.FromURL(proxyURL, proxy.Direct)
 		if err != nil {
 			fmt.Println("Failed to create proxy dialer:", err)

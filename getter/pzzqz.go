@@ -1,9 +1,10 @@
 package getter
 
 import (
+	"strings"
+
 	"github.com/Aiicy/htmlquery"
 	"github.com/henson/proxypool/pkg/models"
-	clog "unknwon.dev/clog/v2"
 )
 
 // PZZQZ get ip from http://pzzqz.com/
@@ -12,7 +13,7 @@ func PZZQZ() (result []*models.IP) {
 	doc, _ := htmlquery.LoadURL(pollURL)
 	trNode, err := htmlquery.Find(doc, "//table[@class='table table-hover']//tbody//tr")
 	if err != nil {
-		clog.Warn(err.Error())
+		// clog.Warn("pzzqz:", err.Error())
 	}
 	for i := 0; i < len(trNode); i++ {
 		tdNode, _ := htmlquery.Find(trNode[i], "//td")
@@ -22,11 +23,11 @@ func PZZQZ() (result []*models.IP) {
 
 		IP := models.NewIP()
 		IP.Data = ip + ":" + port
-		IP.Type1 = Type
+		IP.Type1 = strings.ToLower(Type)
 		IP.Source = "pzzqz"
 		result = append(result, IP)
 	}
 
-	clog.Info("[pzzqz] done")
+	// clog.Info("[pzzqz] done")
 	return
 }
