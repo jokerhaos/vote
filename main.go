@@ -81,6 +81,20 @@ func init() {
 	logger = log.New(logFile, "[info]", log.Ltime)
 }
 
+func setUserErr(content ...string) {
+	filename := "userError.txt" // 目标文件名
+	// 打开文件，使用追加模式打开
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		fmt.Println("Failed to open file:", err)
+		return
+	}
+	defer file.Close()
+
+	// 写入数据到文件
+	_, err = file.WriteString(strings.Join(content, ",") + "\n")
+}
+
 func main() {
 	// 初始化配置
 	config.InitLog()
@@ -103,7 +117,7 @@ func main() {
 	fmt.Printf("请输入停顿时间,单位毫秒,默认10000毫秒：")
 	fmt.Scanf("%d\n", &gap)
 	if gap == 0 {
-		gap = 10
+		gap = 10000
 	}
 
 	fmt.Printf("是否自动注册，默认不自动注册，自动注册请输入“ 1 ”：")
@@ -115,59 +129,61 @@ func main() {
 		if userPath == "" {
 			userPath = "./4444.xlsx"
 		}
-		// 打开 Excel 文件
-		f, err := excelize.OpenFile(userPath)
-		if err != nil {
-			fmt.Println("无法打开文件:", err)
-			return
-		}
-
-		// 选择要读取的工作表
-		sheetName := "Sheet1"
-		rows, err := f.GetRows(sheetName)
-		if err != nil {
-			fmt.Println("无法打开文件:", err)
-			return
-		}
 		fmt.Println("读取文件中……")
-		// 读取每一行数据
-		for _, row := range rows {
-			if len(row) < 2 {
-				continue
+		// 判断文件
+		if strings.Contains(userPath, "xlsx") {
+			// 打开 Excel 文件
+			f, err := excelize.OpenFile(userPath)
+			if err != nil {
+				fmt.Println("无法打开文件:", err)
+				return
 			}
-			user := utils.ParseLogEntry2(row)
-			// 今日已经用过的账号屏蔽
-			if utils.IndexOf(user["email"]) {
-				continue
+			// 选择要读取的工作表
+			sheetName := "Sheet1"
+			rows, err := f.GetRows(sheetName)
+			if err != nil {
+				fmt.Println("无法打开文件:", err)
+				return
 			}
-			userData = append(userData, user)
-			// fmt.Println(utils.ParseLogEntry2(row))
+			// 读取每一行数据
+			for _, row := range rows {
+				if len(row) < 2 {
+					continue
+				}
+				user := utils.ParseLogEntry(strings.Join(row, ","))
+				// fmt.Println(user)
+				// 今日已经用过的账号屏蔽
+				if utils.IndexOf(user["email"]) {
+					continue
+				}
+				userData = append(userData, user)
+			}
+		} else {
+			// 读取txt文本
+			file, err := os.Open(userPath)
+			if err != nil {
+				fmt.Println("无法打开文件:", err)
+				return
+			}
+			defer file.Close()
+			// 创建一个Scanner来读取文件内容
+			scanner := bufio.NewScanner(file)
+			// 逐行读取文件内容
+			for scanner.Scan() {
+				line := scanner.Text()
+				// 账号处理
+				user := utils.ParseLogEntry(line)
+				// fmt.Println(user)
+				userData = append(userData, user)
+			}
+			// 检查扫描过程是否有错误
+			if err := scanner.Err(); err != nil {
+				fmt.Println("读取文件错误:", err)
+			}
 		}
+
 		fmt.Println("读取完毕总共账号：", len(userData), "个")
-
-		// 读取txt文本
-		// file, err := os.Open(userPath)
-		// if err != nil {
-		// 	fmt.Println("无法打开文件:", err)
-		// 	return
-		// }
-		// defer file.Close()
-
-		// // 创建一个Scanner来读取文件内容
-		// scanner := bufio.NewScanner(file)
-
-		// // 逐行读取文件内容
-		// for scanner.Scan() {
-		// 	line := scanner.Text()
-		// 	// 账号处理
-		// 	fmt.Println(utils.ParseLogEntry(line))
-		// 	userData = append(userData, utils.ParseLogEntry(line))
-		// }
-
-		// 检查扫描过程是否有错误
-		// if err := scanner.Err(); err != nil {
-		// 	fmt.Println("读取文件错误:", err)
-		// }
+		// time.Sleep(time.Hour)
 
 	} else {
 		fmt.Printf("密码是否随机默认是，不随机请输入你想要的密码，想随机直接回车：")
@@ -205,8 +221,9 @@ func main() {
 	headers.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36")
 	success := 0
 	total := 0
+	var wg sync.WaitGroup
 	// 开始进行投票
-	for success < num {
+	for success < num || (autoRegister == 0 && success == len(userData)) {
 		if total > 0 {
 			time.Sleep(time.Millisecond * time.Duration(gap))
 		}
@@ -227,50 +244,76 @@ func main() {
 		default:
 		}
 		total++
-		err := vote.setToken()
-		if err != nil {
-			color.Red("获取cookie报错咯：%s\r\n", err)
-			continue
-		}
-		// fmt.Println("Token:", vote.Token)
-		// fmt.Println("Cookie:", vote.Cookies)
-		if autoRegister == 0 {
-			// 使用账号本自动登录
-			if total-1 > len(userData) {
-				color.Red("账号本的账号都使用完了，无可用账户，请使用另外的账号本！！！\r\n")
+		wg.Add(1)
+		// 开启协程
+		type ft func(int, *Vote, ft)
+		f := func(total int, vote *Vote, f ft) {
+			err := vote.setToken()
+			var user map[string]string
+			if autoRegister == 0 && total-1 <= len(userData) {
+				user = userData[total-1]
+			}
+			if err != nil {
+				color.Red("投票情况，总投：%d，获取cookie报错咯：%s\r\n", success, err)
+				if user != nil {
+					time.Sleep(time.Second * 10)
+					f(total, &Vote{
+						SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryIxwj5hbrEYmmpCOc"),
+					}, f)
+				}
 				return
 			}
-			user := userData[total-1]
-			if len(user) == 0 {
-				color.Red("账号本的账号都使用完了，无可用账户，请使用另外的账号本！！！\r\n")
-				continue
-			}
-			err = vote.login(user["email"], user["pwd"])
-			if err != nil {
-				color.Red("登录失败咯：%s\r\n", err)
-				continue
-			}
-			// 判断账户是否有投票
 
-		} else {
-			// 自动注册
-			err = vote.register(pwd)
+			if autoRegister == 0 {
+				// 使用账号本自动登录
+				if total-1 > len(userData) {
+					color.Red("账号本的账号都使用完了，无可用账户，请使用另外的账号本！！！\r\n")
+					return
+				}
+				if len(user) == 0 {
+					color.Red("账号本的账号都使用完了，无可用账户，请使用另外的账号本！！！\r\n")
+					return
+				}
+				err = vote.login(user["email"], user["pwd"])
+				if err != nil {
+					color.Red("投票情况，总投：%d，登录失败咯：%s\r\n", success, err)
+					time.Sleep(time.Second * 10)
+					f(total, &Vote{
+						SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryIxwj5hbrEYmmpCOc"),
+					}, f)
+					return
+				}
+				// 判断账户是否有投票
+
+			} else {
+				// 自动注册
+				err = vote.register(pwd)
+				if err != nil {
+					colorPrint.Add(color.FgRed)
+					colorPrint.Println("注册账号报错咯:", err)
+					return
+				}
+			}
+			err = vote.vote(id)
 			if err != nil {
 				colorPrint.Add(color.FgRed)
-				colorPrint.Println("注册账号报错咯:", err)
-				continue
+				color.Red("投票情况，总投：%d，投票报错咯：%s\r\n", success, err)
+				time.Sleep(time.Second * 10)
+				// f(total, &Vote{
+				// 	SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryIxwj5hbrEYmmpCOc"),
+				// }, f)
+				return
 			}
+			fmt.Println("======本轮投票结束进行下一次投票======")
+			success++
 		}
-		err = vote.vote(id)
-		if err != nil {
-			colorPrint.Add(color.FgRed)
-			colorPrint.Println("投票报错咯:", err)
-			continue
-		}
-		fmt.Println("======本轮投票结束进行下一次投票======")
-		success++
-	}
+		go func(total int, vote *Vote) {
+			defer wg.Done()
+			f(total, vote, f)
+		}(total, vote)
 
+	}
+	wg.Wait()
 	fmt.Printf("投票结束了，60秒后自动关闭窗口，投给 %d 号明星，总共投票次数：%d ，成功投票：%d\r\n", id, total, success)
 	time.Sleep(time.Second * 60)
 }
@@ -398,7 +441,7 @@ func (selfs *Vote) vote(id int) error {
 	fmt.Println("请求参数:", data.Encode())
 
 	// 进行请求
-	responseBody, _, err := selfs.SendRequest.Post("https://9entertainawards.mcot.net/vote/vote", data)
+	responseBody, _, err := selfs.SendRequest.RepeatPost("https://9entertainawards.mcot.net/vote/vote", data)
 	if err != nil {
 		return err
 	}

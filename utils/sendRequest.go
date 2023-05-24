@@ -16,10 +16,11 @@ import (
 )
 
 type SendRequest struct {
-	client   *http.Client
-	retryNum int // 重试次数
-	headers  *http.Header
-	boundary string
+	client    *http.Client
+	retryNum  int // 重试次数
+	retryTime int // 重试间隔时间
+	headers   *http.Header
+	boundary  string
 }
 
 func NewSendRequest(headers *http.Header, boundary string) *SendRequest {
@@ -31,9 +32,9 @@ func NewSendRequest(headers *http.Header, boundary string) *SendRequest {
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		retryNum: 5,
-		headers:  headers,
-		boundary: boundary,
+		retryTime: 10,
+		headers:   headers,
+		boundary:  boundary,
 	}
 }
 
@@ -127,7 +128,8 @@ func (s *SendRequest) send(method string, url string, param url.Values, headers 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil, errors.New(fmt.Sprintf("状态码：%d，内容：%s", resp.StatusCode, string(body)))
+		// return nil, nil, errors.New(fmt.Sprintf("状态码：%d，内容：%s", resp.StatusCode, string(body)))
+		return nil, nil, errors.New(fmt.Sprintf("状态码：%d", resp.StatusCode))
 	}
 
 	return body, resp, nil
@@ -137,23 +139,19 @@ func (s *SendRequest) Post(url string, param url.Values) ([]byte, *http.Response
 	return s.send("POST", url, param, nil)
 }
 
-func (s *SendRequest) RepeatPost(uuid, url string, param url.Values, timeout time.Duration, num int, headers map[string]string) {
-	time.Sleep(timeout)
-
-	fmt.Printf("[%s][%d]请求地址：%s\n", uuid, num, url)
-	fmt.Printf("[%s][%d]本次发送：%v\n", uuid, num, param)
-
-	result, _, err := s.Post(url, param)
-	if err != nil {
-		fmt.Printf("[%s][%d]请求返回错误：%v\n", uuid, num, err)
-		return
-	}
-	fmt.Printf("[%s][%d]请求返回：%s\n", uuid, num, result)
-
-	if string(result) != "success" && num < 5 {
+func (s *SendRequest) RepeatPost(url string, param url.Values) ([]byte, *http.Response, error) {
+	// fmt.Printf("[%s][%d]请求地址：%s\n", uuid, num, url)
+	// fmt.Printf("[%s][%d]本次发送：%v\n", uuid, num, param)
+	result, resp, err := s.Post(url, param)
+	if err != nil && s.retryNum < 5 {
+		time.Sleep(time.Second * time.Duration(s.retryTime))
+		// fmt.Printf("[%s][%d]请求返回错误：%v\n", uuid, num, err)
+		s.retryNum++
+		s.retryNum = s.retryNum * 2
 		// 进行重发
-		s.RepeatPost(uuid, url, param, timeout*2, num+1, headers)
+		return s.RepeatPost(url, param)
 	}
+	return result, resp, err
 }
 
 func (s *SendRequest) Get(url string, headers http.Header) ([]byte, *http.Response, error) {

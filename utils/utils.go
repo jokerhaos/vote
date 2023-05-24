@@ -52,29 +52,23 @@ func MapToUrlValue(params map[string]string) url.Values {
 
 func ParseLogEntry(logEntry string) map[string]string {
 	result := make(map[string]string)
-
 	// 提取账号和密码信息
-	// re := regexp.MustCompile(`账号:(.*?),密码:(.*?),`)
-	re := regexp.MustCompile(`账号:(.*?)[，,]*密码:(.*?)($|，|,)`)
-	matches := re.FindStringSubmatch(logEntry)
-	if len(matches) >= 4 {
-		result["email"] = matches[1]
-		result["pwd"] = matches[2]
+	if strings.Contains(logEntry, ":") {
+		re := regexp.MustCompile(`账号:(.*?)[，,]*密码:(.*?)($|，|,)`)
+		matches := re.FindStringSubmatch(logEntry)
+		if len(matches) >= 4 {
+			result["email"] = matches[1]
+			result["pwd"] = matches[2]
+		}
+	} else {
+		// 分割字符串
+		parts := strings.Split(logEntry, ",")
+		// 创建map变量并存储账号和密码
+		result = map[string]string{
+			"email": parts[0],
+			"pwd":   parts[1],
+		}
 	}
-
-	return result
-}
-
-func ParseLogEntry2(logEntry []string) map[string]string {
-	result := make(map[string]string)
-
-	// 提取账号和密码信息
-	// re := regexp.MustCompile(`账号:(.*?),密码:(.*?),`)
-	re := regexp.MustCompile(`账号:(.*?)[，,]*密码:(.*?)($|，|,)`)
-	matches := re.FindStringSubmatch(strings.Join(logEntry, ","))
-	result["email"] = matches[1]
-	result["pwd"] = matches[2]
-
 	return result
 }
 
