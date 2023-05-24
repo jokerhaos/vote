@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -53,12 +54,39 @@ func ParseLogEntry(logEntry string) map[string]string {
 	result := make(map[string]string)
 
 	// 提取账号和密码信息
-	re := regexp.MustCompile(`账号:(.*?),密码:(.*?),`)
+	// re := regexp.MustCompile(`账号:(.*?),密码:(.*?),`)
+	re := regexp.MustCompile(`账号:(.*?)[，,]*密码:(.*?)($|，|,)`)
 	matches := re.FindStringSubmatch(logEntry)
-	if len(matches) >= 3 {
+	if len(matches) >= 4 {
 		result["email"] = matches[1]
 		result["pwd"] = matches[2]
 	}
 
 	return result
+}
+
+func ParseLogEntry2(logEntry []string) map[string]string {
+	result := make(map[string]string)
+
+	// 提取账号和密码信息
+	// re := regexp.MustCompile(`账号:(.*?),密码:(.*?),`)
+	re := regexp.MustCompile(`账号:(.*?)[，,]*密码:(.*?)($|，|,)`)
+	matches := re.FindStringSubmatch(strings.Join(logEntry, ","))
+	result["email"] = matches[1]
+	result["pwd"] = matches[2]
+
+	return result
+}
+
+func IndexOf(targetString string) bool {
+	filePath := fmt.Sprintf("./logs/info-%s.log", time.Now().Local().Format("2006-01-02"))
+	// 读取文件内容
+	content, _ := ioutil.ReadFile(filePath)
+	filePath2 := fmt.Sprintf("./logs/error-%s.log", time.Now().Local().Format("2006-01-02"))
+	// 读取文件内容
+	content2, _ := ioutil.ReadFile(filePath2)
+	// 将文件内容转换为字符串
+	fileContent := string(content) + string(content2)
+	// 判断目标字符串是否在文件内容中
+	return strings.Contains(fileContent, targetString)
 }

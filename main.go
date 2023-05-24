@@ -13,7 +13,10 @@ import (
 	"sync"
 	"time"
 	"vote/config"
+	"vote/getter"
 	"vote/utils"
+
+	"github.com/xuri/excelize/v2"
 
 	"github.com/fatih/color"
 	"github.com/google/go-querystring/query"
@@ -97,7 +100,7 @@ func main() {
 	if num == 0 {
 		num = 10000000000
 	}
-	fmt.Printf("请输入停顿时间,默认10秒：")
+	fmt.Printf("请输入停顿时间,单位毫秒,默认10000毫秒：")
 	fmt.Scanf("%d\n", &gap)
 	if gap == 0 {
 		gap = 10
@@ -107,47 +110,81 @@ func main() {
 	fmt.Scanf("%d\n", &autoRegister)
 	var userData []map[string]string
 	if autoRegister == 0 {
-		fmt.Printf("请输入账号本文件路径，默认路径是./user.txt，使用默认路径直接回车：")
+		fmt.Printf("请输入账号本文件路径，默认路径是./4444.xlsx：")
 		fmt.Scanf("%s\n", &userPath)
 		if userPath == "" {
-			userPath = "./user.txt"
+			userPath = "./4444.xlsx"
+		}
+		// 打开 Excel 文件
+		f, err := excelize.OpenFile(userPath)
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		file, err := os.Open(userPath)
+		// 选择要读取的工作表
+		sheetName := "Sheet1"
+		rows, err := f.GetRows(sheetName)
 		if err != nil {
 			fmt.Println("无法打开文件:", err)
 			return
 		}
-		defer file.Close()
-
-		// 创建一个Scanner来读取文件内容
-		scanner := bufio.NewScanner(file)
-
-		// 逐行读取文件内容
-		for scanner.Scan() {
-			line := scanner.Text()
-			// 账号处理
-			// fmt.Println(utils.ParseLogEntry(line))
-			userData = append(userData, utils.ParseLogEntry(line))
+		fmt.Println("读取文件中……")
+		// 读取每一行数据
+		for _, row := range rows {
+			if len(row) < 2 {
+				continue
+			}
+			user := utils.ParseLogEntry2(row)
+			// 今日已经用过的账号屏蔽
+			if utils.IndexOf(user["email"]) {
+				continue
+			}
+			userData = append(userData, user)
+			// fmt.Println(utils.ParseLogEntry2(row))
 		}
+		fmt.Println("读取完毕总共账号：", len(userData), "个")
+
+		// 读取txt文本
+		// file, err := os.Open(userPath)
+		// if err != nil {
+		// 	fmt.Println("无法打开文件:", err)
+		// 	return
+		// }
+		// defer file.Close()
+
+		// // 创建一个Scanner来读取文件内容
+		// scanner := bufio.NewScanner(file)
+
+		// // 逐行读取文件内容
+		// for scanner.Scan() {
+		// 	line := scanner.Text()
+		// 	// 账号处理
+		// 	fmt.Println(utils.ParseLogEntry(line))
+		// 	userData = append(userData, utils.ParseLogEntry(line))
+		// }
 
 		// 检查扫描过程是否有错误
-		if err := scanner.Err(); err != nil {
-			fmt.Println("读取文件错误:", err)
-		}
+		// if err := scanner.Err(); err != nil {
+		// 	fmt.Println("读取文件错误:", err)
+		// }
 
 	} else {
 		fmt.Printf("密码是否随机默认是，不随机请输入你想要的密码，想随机直接回车：")
 		fmt.Scanf("%s\n", &pwd)
 	}
-	ipChan := make(chan *models.IP, 2000)
-	go func() {
-		// Start getters to scraper IP and put it in channel
-		for {
-			go ipProxyRun(ipChan)
-			time.Sleep(10 * time.Minute)
-		}
-	}()
+
+	if gap == 0 {
+		gap = 10
+	}
+
+	ipChan := make(chan *models.IP, 1)
+	// go func() {
+	// 	// Start getters to scraper IP and put it in channel
+	// 	for {
+	// 		go ipProxyRun(ipChan)
+	// 		time.Sleep(10 * time.Minute)
+	// 	}
+	// }()
 	// fmt.Println(userData)
 	// time.Sleep(time.Second * 15)
 	headers := &http.Header{}
@@ -170,20 +207,22 @@ func main() {
 	// 开始进行投票
 	for success < num {
 		if total > 0 {
-			time.Sleep(time.Second * time.Duration(gap))
+			time.Sleep(time.Millisecond * time.Duration(gap))
 		}
+		// 算了因为我是分钟收费ip，特殊情况特殊处理一下……
+		ipProxyRun(ipChan)
+
 		headers.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryIxwj5hbrEYmmpCOc")
 		vote := &Vote{
 			SendRequest: utils.NewSendRequest(headers, "----WebKitFormBoundaryIxwj5hbrEYmmpCOc"),
 		}
-		// vote.SendRequest.SetProxy("socks5://123.180.0.196:2324", "socks5")
 		// 获取代理ip
 		select {
 		case proxyIp := <-ipChan:
 			// 设置代理ip
 			proxyurl := fmt.Sprintf("%s://%s", proxyIp.Type1, proxyIp.Data)
 			fmt.Println("代理ip：", proxyurl)
-			vote.SendRequest.SetProxy(proxyurl, "socks")
+			vote.SendRequest.SetProxy(proxyurl, proxyIp.Type1)
 		default:
 		}
 		total++
@@ -368,6 +407,7 @@ func (selfs *Vote) vote(id int) error {
 	json.Unmarshal(responseBody, &response)
 	if !response.Result {
 		color.Red("￣へ￣ 投票失败 ￣へ￣ \r\n")
+		config.Log.Error(fmt.Sprintf("账号:%s,密码:%s,投票 %d 号失败", selfs.Email, selfs.Password, id))
 		return errors.New(string(responseBody))
 	}
 	color.Green("o(*￣▽￣*)ブ 投票 %d号 成功 o(*￣▽￣*)ブ \r\n", id)
@@ -394,6 +434,7 @@ func ipProxyRun(ipChan chan<- *models.IP) {
 		// getter.PLP, //need to remove it
 		// getter.PLPSSL,
 		// getter.IP89,
+		getter.Hsk,
 	}
 	for _, f := range funs {
 		wg.Add(1)
@@ -407,7 +448,7 @@ func ipProxyRun(ipChan chan<- *models.IP) {
 			temp := f()
 			// log.Println("[run] get into loop", temp)
 			for _, v := range temp {
-				log.Println("[run] len of ipChan %v", v)
+				// log.Println("[run] len of ipChan %v", v)
 				// if v.Type1 == "https" {
 				ipChan <- v
 				// }
@@ -416,5 +457,5 @@ func ipProxyRun(ipChan chan<- *models.IP) {
 		}(f)
 	}
 	wg.Wait()
-	log.Println("All getters finished.")
+	// log.Println("All getters finished.")
 }
