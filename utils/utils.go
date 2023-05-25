@@ -102,3 +102,25 @@ func IndexOf(targetString string) bool {
 	// 判断目标字符串是否在文件内容中
 	return strings.Contains(fileContent, targetString)
 }
+
+func GetHeaders() http.Header {
+	// 设置请求头
+	headers := http.Header{}
+	headers.Add("authority", "9entertainawards.mcot.net")
+	headers.Add("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+	headers.Add("accept-language", "zh-CN,zh;q=0.9")
+	headers.Add("cache-control", "no-cache")
+	headers.Add("pragma", "no-cache")
+	// headers.Add("referer", "https://9entertainawards.mcot.net/")
+	headers.Add("sec-ch-ua", "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"")
+	headers.Add("sec-ch-ua-mobile", "?0")
+	headers.Add("sec-ch-ua-platform", "\"Windows\"")
+	headers.Add("sec-fetch-dest", "document")
+	headers.Add("sec-fetch-mode", "navigate")
+	headers.Add("sec-fetch-site", "same-origin")
+	headers.Add("sec-fetch-user", "?1")
+	headers.Add("upgrade-insecure-requests", "1")
+	headers.Add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36")
+	headers.Set("User-Agent", GenerateUserAgent())
+	return headers
+}

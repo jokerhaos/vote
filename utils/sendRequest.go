@@ -19,13 +19,13 @@ type SendRequest struct {
 	client    *http.Client
 	retryNum  int // 重试次数
 	retryTime int // 重试间隔时间
-	headers   *http.Header
+	headers   http.Header
 	boundary  string
 }
 
-func NewSendRequest(headers *http.Header, boundary string) *SendRequest {
+func NewSendRequest(headers http.Header, boundary string) *SendRequest {
 	if headers == nil {
-		headers = &http.Header{}
+		headers = http.Header{}
 		headers.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 	return &SendRequest{
@@ -113,7 +113,7 @@ func (s *SendRequest) send(method string, url string, param url.Values, headers 
 	if headers != nil && len(headers) > 0 {
 		req.Header = headers
 	} else {
-		req.Header = *s.headers
+		req.Header = s.headers
 	}
 
 	resp, err := s.client.Do(req)

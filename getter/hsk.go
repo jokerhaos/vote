@@ -43,7 +43,7 @@ func Hsk() (result []*models.IP) {
 func doTask() {
 	// pollURL := "https://mobile.huashengdaili.com/servers.php?session=U635687460520130658--b749048e1698763014830e66e5c7230d&time=60&count=1&type=text&pw=no&protocol=s5&ip_type=tunnel"
 	pollURL := "https://mobile.huashengdaili.com/servers.php?session=U635687460520130658--b749048e1698763014830e66e5c7230d&time=1&count=1&type=text&pw=no&protocol=s5&ip_type=tunnel"
-	req := utils.NewSendRequest(&http.Header{}, "")
+	req := utils.NewSendRequest(http.Header{}, "")
 	body, _, err := req.Get(pollURL, http.Header{})
 	if err != nil {
 		return

@@ -205,23 +205,6 @@ func main() {
 	// }()
 	// fmt.Println(userData)
 	// time.Sleep(time.Second * 15)
-	headers := &http.Header{}
-	// 设置请求头
-	headers.Add("authority", "9entertainawards.mcot.net")
-	headers.Add("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-	headers.Add("accept-language", "zh-CN,zh;q=0.9")
-	headers.Add("cache-control", "no-cache")
-	headers.Add("pragma", "no-cache")
-	// headers.Add("referer", "https://9entertainawards.mcot.net/")
-	headers.Add("sec-ch-ua", "\"Google Chrome\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"")
-	headers.Add("sec-ch-ua-mobile", "?0")
-	headers.Add("sec-ch-ua-platform", "\"Windows\"")
-	headers.Add("sec-fetch-dest", "document")
-	headers.Add("sec-fetch-mode", "navigate")
-	headers.Add("sec-fetch-site", "same-origin")
-	headers.Add("sec-fetch-user", "?1")
-	headers.Add("upgrade-insecure-requests", "1")
-	headers.Add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36")
 	success := 0
 	total := 0
 	var wg sync.WaitGroup
@@ -232,7 +215,7 @@ func main() {
 		}
 		// 算了因为我是分钟收费ip，特殊情况特殊处理一下……
 		// go ipProxyRun(ipChan)
-		headers.Set("User-Agent", utils.GenerateUserAgent())
+		headers := utils.GetHeaders()
 		boundary, _ := utils.GenerateRandomBoundary()
 		headers.Set("Content-Type", "multipart/form-data; boundary="+boundary)
 		vote := &Vote{
@@ -311,12 +294,12 @@ func main() {
 			success++
 			fmt.Printf("======本轮投票结束进行下一次投票 当前投了 %d 票======\r\n", success)
 		}
-		// go func(total int, vote *Vote) {
-		// 	defer wg.Done()
-		// 	f(total, vote, f)
-		// }(total, vote)
-		f(total, vote, f)
-		wg.Done()
+		go func(total int, vote *Vote) {
+			defer wg.Done()
+			f(total, vote, f)
+		}(total, vote)
+		// f(total, vote, f)
+		// wg.Done()
 	}
 	wg.Wait()
 	fmt.Printf("投票结束了，60秒后自动关闭窗口，投给 %d 号明星，总共投票次数：%d ，成功投票：%d\r\n", id, total, success)
